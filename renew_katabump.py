@@ -359,6 +359,37 @@ def _handle_turnstile(sb, masked_user, context=""):
             pass
         time.sleep(0.5)
 
+    # 调试：打印 Turnstile iframe 和 input 的详细信息
+    try:
+        debug_info = sb.execute_script("""
+        (function() {
+            var iframes = document.querySelectorAll('iframe');
+            var iframe_info = [];
+            for (var i = 0; i < iframes.length; i++) {
+                var r = iframes[i].getBoundingClientRect();
+                iframe_info.push({
+                    src: (iframes[i].src || '').substring(0, 80),
+                    w: Math.round(r.width), h: Math.round(r.height),
+                    x: Math.round(r.x), y: Math.round(r.y)
+                });
+            }
+            var ts = document.querySelector('input[name="cf-turnstile-response"]');
+            var ts_info = ts ? {
+                value_len: (ts.value || '').length,
+                rect: (function() { var r = ts.getBoundingClientRect(); return {w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), y: Math.round(r.y)}; })()
+            } : null;
+            return JSON.stringify({iframes: iframe_info, ts: ts_info});
+        })()
+        """)
+        logger.info(f"[{masked_user}] [{context}] Turnstile debug: {debug_info}")
+        try:
+            sb.save_screenshot(f"turnstile_debug_{masked_user}.png")
+            logger.info(f"[{masked_user}] [{context}] 截图已保存")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"[{masked_user}] [{context}] 调试信息获取失败: {e}")
+
     # 尝试切换到 Turnstile iframe 内部点击 checkbox
     try:
         iframes = sb.find_elements("iframe")
