@@ -567,12 +567,21 @@ def login(sb, email, password):
     use_uc = os.environ.get("USE_UC", "true" if IS_LINUX else "false").lower() == "true"
     if use_uc:
         try:
-            sb.uc_open_with_reconnect(BASE_URL + "/auth/login", reconnect_time=8)
+            sb.uc_open_with_reconnect(BASE_URL + "/auth/login", reconnect_time=4)
         except Exception:
             sb.open(BASE_URL + "/auth/login")
     else:
         sb.open(BASE_URL + "/auth/login")
-    time.sleep(8)
+    time.sleep(4)
+
+    # UC 模式下使用 uc_gui_click_captcha 自动处理 Cloudflare Turnstile
+    if use_uc:
+        try:
+            sb.uc_gui_click_captcha()  # 自动检测并点击 Turnstile
+            logger.info(f"[{masked}] uc_gui_click_captcha 已执行")
+            time.sleep(3)
+        except Exception as e:
+            logger.warning(f"[{masked}] uc_gui_click_captcha 失败: {e}")
 
     # 等待 Cloudflare 验证通过（最多 30 秒）
     logger.info(f"[{masked}] 等待 Cloudflare 验证通过...")
