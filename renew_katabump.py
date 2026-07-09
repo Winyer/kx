@@ -381,7 +381,7 @@ def _handle_turnstile(sb, masked_user, context=""):
             return JSON.stringify({iframes: iframe_info, ts: ts_info});
         })()
         """)
-        logger.info(f"[{masked_user}] [{context}] Turnstile debug: {debug_info}")
+        print(f"DEBUG: Turnstile debug: {debug_info}", flush=True)
         try:
             sb.save_screenshot(f"turnstile_debug_{masked_user}.png")
             logger.info(f"[{masked_user}] [{context}] 截图已保存")
