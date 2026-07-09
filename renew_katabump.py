@@ -92,12 +92,21 @@ class KatabumpAutoRenew:
         if PROXY_SERVER:
             chrome_options.add_argument(f'--proxy-server={PROXY_SERVER}')
         chrome_binary = '/usr/bin/google-chrome'
+        version_main = None
         if os.path.exists(chrome_binary):
             chrome_options.binary_location = chrome_binary
-            logger.info("🛠️ 驱动初始化 - 使用系统 Chrome")
-        else:
-            logger.info("🛠️ 驱动初始化 - 自动探测版本（未找到系统 Chrome）")
-        self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS, version_main=149, use_subprocess=False)
+            import subprocess
+            try:
+                result = subprocess.run([chrome_binary, '--version'], capture_output=True, text=True, timeout=5)
+                v = result.stdout.strip().split()[-1].split('.')[0]
+                if v.isdigit():
+                    version_main = int(v)
+                    logger.info(f"🛠️ 驱动初始化 - 系统 Chrome {version_main}")
+            except Exception:
+                pass
+        if version_main is None:
+            logger.info("🛠️ 驱动初始化 - 自动探测版本")
+        self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS, version_main=version_main, use_subprocess=True)
         return self.driver.set_window_size(1280, 720)
 
     def _handle_turnstile(self, context=""):
