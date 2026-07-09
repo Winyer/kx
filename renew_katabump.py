@@ -83,6 +83,10 @@ class KatabumpAutoRenew:
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--disable-software-rasterizer')
+        chrome_options.add_argument('--disable-accelerated-2d-canvas')
+        chrome_options.add_argument('--disable-webgl')
+        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+        chrome_options.add_argument('--disable-extensions')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_argument('--remote-debugging-port=9222')
         if PROXY_SERVER:
@@ -93,7 +97,7 @@ class KatabumpAutoRenew:
             logger.info("🛠️ 驱动初始化 - 使用系统 Chrome")
         else:
             logger.info("🛠️ 驱动初始化 - 自动探测版本（未找到系统 Chrome）")
-        self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS, version_main=149, use_subprocess=True)
+        self.driver = uc.Chrome(options=chrome_options, headless=HEADLESS, version_main=149, use_subprocess=False)
         return self.driver.set_window_size(1280, 720)
 
     def _handle_turnstile(self, context=""):
