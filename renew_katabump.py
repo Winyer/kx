@@ -562,11 +562,15 @@ def login(sb, email, password):
     masked = mask_email(email)
     logger.info(f"[{masked}] 开始登录")
 
-    # 使用 uc_open_with_reconnect 自动处理 Cloudflare
+    # 打开登录页面（UC 模式用 uc_open_with_reconnect，普通模式用 sb.open）
     logger.info(f"[{masked}] 打开登录页面: {BASE_URL}/auth/login")
-    try:
-        sb.uc_open_with_reconnect(BASE_URL + "/auth/login", reconnect_time=8)
-    except AttributeError:
+    use_uc = os.environ.get("USE_UC", "true" if IS_LINUX else "false").lower() == "true"
+    if use_uc:
+        try:
+            sb.uc_open_with_reconnect(BASE_URL + "/auth/login", reconnect_time=8)
+        except Exception:
+            sb.open(BASE_URL + "/auth/login")
+    else:
         sb.open(BASE_URL + "/auth/login")
     time.sleep(8)
 
