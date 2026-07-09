@@ -1,18 +1,36 @@
 name: Auto Renew Katabump
 
-on:  
+on:
   schedule:
-    - cron: '22 1 * * *'  # 每天运行一次（UTC时间 03:17）
-  workflow_dispatch:  # 允许手动触发
+    - cron: '22 1 * * *'  # 每天 UTC 01:22 运行（北京时间 09:22）
+  workflow_dispatch:       # 允许手动触发
 
 jobs:
-   auto_renew_katabump:
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check.outputs.should_skip }}
+    steps:
+      - name: Interval Check (Strict 4-day cycle)
+        id: check
+        run: |
+          DAYS=$(( $(date -u +%s) / 86400 ))
+          REMAINDER=$(( $DAYS % 4 ))
+          if [ $REMAINDER -ne 0 ]; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  auto_renew_katabump:
+    needs: pre-check
+    if: needs.pre-check.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     env:
       ACCOUNTS: ${{ secrets.ACCOUNTS }}
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
-      
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,34 +38,44 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install Chrome and dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb ca-certificates curl
-          sudo apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 libu2f-udev
-          # Install Google Chrome Stable
-          sudo rm -f /usr/share/keyrings/google-chrome.gpg
-          curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor --batch --no-tty -o /usr/share/keyrings/google-chrome.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-          pip install -r requirements.txt
-          
-      - name: Detect Chrome Version
-        id: get_version
-        run: |
-          CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+' | head -1)
-          echo "Detected Chrome Major Version: $CHROME_VERSION"
-          echo "CHROME_VERSION=$CHROME_VERSION" >> $GITHUB_ENV
+          sudo apt-get install -y xvfb x11-utils xdotool scrot fonts-noto-cjk
+          pip install seleniumbase requests
 
-      - name: Start X Virtual Frame Buffer (Xvfb)
-        run: Xvfb :99 -ac &
-            
-      - name: Run Script in Stealth Mode (via Xvfb)
+      - name: Install ChromeDriver
+        run: |
+          seleniumbase install chromedriver
+
+      - name: Set up proxy (sing-box)
+        continue-on-error: true
         env:
-          DISPLAY: ':99'
+          NODE_LINK: ${{ secrets.NODE_LINK }}
+        run: |
+          bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh) || true
+
+      - name: Run renewal script
+        env:
           HEADLESS: 'false'
         run: |
-          python renew_katabump.py
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python renew_katabump.py
+
+      - name: Clean up old workflow runs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runs=$(gh run list --workflow="${{ github.workflow }}" --limit=100 \
+            --json databaseId --jq '.[].databaseId')
+          count=0
+          for run_id in $runs; do
+            count=$((count + 1))
+            if [ $count -gt 1 ]; then
+              echo "Deleting run: $run_id"
+              gh run delete $run_id || true
+            fi
+          done
